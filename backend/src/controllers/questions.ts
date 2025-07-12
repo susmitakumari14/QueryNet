@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import { Question } from '../models/Question';
 import { User } from '../models/User';
 import { Answer } from '../models/Answer';
@@ -125,7 +126,7 @@ export const getQuestion = async (req: Request, res: Response, next: NextFunctio
 // @desc    Create new question
 // @route   POST /api/questions
 // @access  Private
-export const createQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const createQuestion = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { title, body, tags } = req.body;
 
@@ -141,11 +142,11 @@ export const createQuestion = async (req: Request, res: Response, next: NextFunc
       title,
       body,
       tags,
-      author: req.user.id,
+      author: req.user?.id,
     });
 
     // Update user stats
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(req.user?.id, {
       $inc: { 'stats.questionsAsked': 1 },
     });
 
@@ -164,7 +165,7 @@ export const createQuestion = async (req: Request, res: Response, next: NextFunc
 // @desc    Update question
 // @route   PUT /api/questions/:id
 // @access  Private
-export const updateQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const updateQuestion = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     let question = await Question.findById(req.params.id);
 
@@ -177,7 +178,7 @@ export const updateQuestion = async (req: Request, res: Response, next: NextFunc
     }
 
     // Make sure user is question owner or admin
-    if (question.author.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (question.author.toString() !== req.user?.id && req.user?.role !== 'admin') {
       res.status(401).json({
         success: false,
         error: 'Not authorized to update this question',
@@ -209,7 +210,7 @@ export const updateQuestion = async (req: Request, res: Response, next: NextFunc
 // @desc    Delete question
 // @route   DELETE /api/questions/:id
 // @access  Private
-export const deleteQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteQuestion = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const question = await Question.findById(req.params.id);
 
@@ -222,7 +223,7 @@ export const deleteQuestion = async (req: Request, res: Response, next: NextFunc
     }
 
     // Make sure user is question owner or admin
-    if (question.author.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (question.author.toString() !== req.user?.id && req.user?.role !== 'admin') {
       res.status(401).json({
         success: false,
         error: 'Not authorized to delete this question',
@@ -252,7 +253,7 @@ export const deleteQuestion = async (req: Request, res: Response, next: NextFunc
 // @desc    Vote on question
 // @route   POST /api/questions/:id/vote
 // @access  Private
-export const voteQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const voteQuestion = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { type } = req.body; // 'upvote' or 'downvote'
 
@@ -276,7 +277,7 @@ export const voteQuestion = async (req: Request, res: Response, next: NextFuncti
 
     // Check if user already voted
     const existingVoteIndex = question.votes.findIndex(
-      vote => vote.user.toString() === req.user.id
+      vote => vote.user.toString() === req.user?.id
     );
 
     if (existingVoteIndex !== -1) {
@@ -289,7 +290,7 @@ export const voteQuestion = async (req: Request, res: Response, next: NextFuncti
     
     if (existingVoteType !== type) {
       question.votes.push({
-        user: req.user.id,
+        user: req.user?.id,
         type: type as 'upvote' | 'downvote',
         createdAt: new Date(),
       });
@@ -375,6 +376,93 @@ export const getQuestionsByUser = async (req: Request, res: Response, next: Next
         pages: Math.ceil(total / limit),
       },
       data: questions,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get related questions based on tags
+// @route   GET /api/questions/:id/related
+// @access  Public
+export const getRelatedQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const questionId = req.params.id;
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    // First get the current question to find its tags
+    const currentQuestion = await Question.findById(questionId);
+    if (!currentQuestion) {
+      res.status(404).json({
+        success: false,
+        error: 'Question not found',
+      });
+      return;
+    }
+
+    // Find questions with similar tags (excluding the current question)
+    const relatedQuestions = await Question.find({
+      _id: { $ne: questionId },
+      tags: { $in: currentQuestion.tags },
+      status: 'open'
+    })
+      .populate('author', 'username avatar reputation')
+      .select('title tags votes views createdAt')
+      .sort({ views: -1, votes: -1 }) // Sort by popularity
+      .limit(limit);
+
+    res.status(200).json({
+      success: true,
+      data: relatedQuestions,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get popular/hot questions
+// @route   GET /api/questions/popular
+// @access  Public
+export const getPopularQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 5;
+    const days = parseInt(req.query.days as string) || 7; // Default to last 7 days
+
+    // Calculate date threshold
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - days);
+
+    // Find popular questions based on views and votes in the last week
+    const popularQuestions = await Question.find({
+      status: 'open',
+      createdAt: { $gte: dateThreshold }
+    })
+      .populate('author', 'username avatar reputation')
+      .select('title tags votes views createdAt')
+      .sort({ 
+        views: -1,
+        votes: -1,
+        createdAt: -1
+      })
+      .limit(limit);
+
+    // If not enough recent questions, get all-time popular ones
+    if (popularQuestions.length < limit) {
+      const additionalQuestions = await Question.find({
+        status: 'open',
+        _id: { $nin: popularQuestions.map(q => q._id) }
+      })
+        .populate('author', 'username avatar reputation')
+        .select('title tags votes views createdAt')
+        .sort({ views: -1, votes: -1 })
+        .limit(limit - popularQuestions.length);
+      
+      popularQuestions.push(...additionalQuestions);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: popularQuestions,
     });
   } catch (error) {
     next(error);

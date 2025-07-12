@@ -156,7 +156,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
 // @access  Private
 export const getMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user?.id);
 
     res.status(200).json({
       success: true,
@@ -187,7 +187,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
       }
     });
 
-    const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+    const user = await User.findByIdAndUpdate(req.user?.id, fieldsToUpdate, {
       new: true,
       runValidators: true,
     });
@@ -216,7 +216,7 @@ export const changePassword = async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const user = await User.findById(req.user.id).select('+password');
+    const user = await User.findById(req.user?.id).select('+password');
 
     if (!user) {
       res.status(404).json({

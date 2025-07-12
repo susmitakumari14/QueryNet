@@ -1,17 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
+
+// Define AuthRequest interface
+export interface AuthRequest extends Request {
+  user?: IUser;
+}
 
 // Extend the Request interface to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: IUser;
     }
   }
 }
 
-export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     let token;
 
@@ -57,7 +62,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
 };
 
 export const authorize = (...roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({
         success: false,

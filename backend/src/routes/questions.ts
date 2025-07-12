@@ -8,6 +8,8 @@ import {
   voteQuestion,
   getQuestionsByTag,
   getQuestionsByUser,
+  getRelatedQuestions,
+  getPopularQuestions,
 } from '../controllers/questions';
 import { protect } from '../middleware/auth';
 
@@ -15,9 +17,11 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getQuestions);
+router.get('/popular', getPopularQuestions); // Must be before /:id
 router.get('/tag/:tag', getQuestionsByTag);
 router.get('/user/:userId', getQuestionsByUser);
 router.get('/:id', getQuestion);
+router.get('/:id/related', getRelatedQuestions);
 
 // Protected routes
 router.post('/', protect, createQuestion);

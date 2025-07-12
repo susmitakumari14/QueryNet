@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import { Answer } from '../models/Answer';
 import { Question } from '../models/Question';
 import { User } from '../models/User';
@@ -36,7 +37,7 @@ export const getAnswers = async (req: Request, res: Response, next: NextFunction
 // @desc    Create new answer
 // @route   POST /api/answers
 // @access  Private
-export const createAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const createAnswer = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { body, questionId } = req.body;
 
@@ -61,14 +62,14 @@ export const createAnswer = async (req: Request, res: Response, next: NextFuncti
     const answer = await Answer.create({
       body,
       question: questionId,
-      author: req.user.id,
+      author: req.user?.id,
     });
 
     // Update question's lastActivity
     await Question.findByIdAndUpdate(questionId, { lastActivity: new Date() });
 
     // Update user stats
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(req.user?.id, {
       $inc: { 'stats.answersGiven': 1 },
     });
 
@@ -87,7 +88,7 @@ export const createAnswer = async (req: Request, res: Response, next: NextFuncti
 // @desc    Update answer
 // @route   PUT /api/answers/:id
 // @access  Private
-export const updateAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const updateAnswer = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     let answer = await Answer.findById(req.params.id);
 
@@ -100,7 +101,7 @@ export const updateAnswer = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Make sure user is answer owner or admin
-    if (answer.author.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (answer.author.toString() !== req.user?.id && req.user?.role !== 'admin') {
       res.status(401).json({
         success: false,
         error: 'Not authorized to update this answer',
@@ -126,7 +127,7 @@ export const updateAnswer = async (req: Request, res: Response, next: NextFuncti
 // @desc    Delete answer
 // @route   DELETE /api/answers/:id
 // @access  Private
-export const deleteAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const deleteAnswer = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const answer = await Answer.findById(req.params.id);
 
@@ -139,7 +140,7 @@ export const deleteAnswer = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Make sure user is answer owner or admin
-    if (answer.author.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (answer.author.toString() !== req.user?.id && req.user?.role !== 'admin') {
       res.status(401).json({
         success: false,
         error: 'Not authorized to delete this answer',
@@ -166,7 +167,7 @@ export const deleteAnswer = async (req: Request, res: Response, next: NextFuncti
 // @desc    Vote on answer
 // @route   POST /api/answers/:id/vote
 // @access  Private
-export const voteAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const voteAnswer = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { type } = req.body;
 
@@ -190,7 +191,7 @@ export const voteAnswer = async (req: Request, res: Response, next: NextFunction
 
     // Check if user already voted
     const existingVoteIndex = answer.votes.findIndex(
-      vote => vote.user.toString() === req.user.id
+      vote => vote.user.toString() === req.user?.id
     );
 
     if (existingVoteIndex !== -1) {
@@ -203,7 +204,7 @@ export const voteAnswer = async (req: Request, res: Response, next: NextFunction
     
     if (existingVoteType !== type) {
       answer.votes.push({
-        user: req.user.id,
+        user: req.user?.id,
         type: type as 'upvote' | 'downvote',
         createdAt: new Date(),
       });
@@ -230,7 +231,7 @@ export const voteAnswer = async (req: Request, res: Response, next: NextFunction
 // @desc    Accept answer
 // @route   POST /api/answers/:id/accept
 // @access  Private
-export const acceptAnswer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const acceptAnswer = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const answer = await Answer.findById(req.params.id);
 
@@ -253,7 +254,7 @@ export const acceptAnswer = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Only question author can accept answers
-    if (question.author.toString() !== req.user.id) {
+    if (question.author.toString() !== req.user?.id) {
       res.status(401).json({
         success: false,
         error: 'Only the question author can accept answers',
@@ -272,7 +273,7 @@ export const acceptAnswer = async (req: Request, res: Response, next: NextFuncti
     // Accept this answer
     answer.isAccepted = true;
     answer.acceptedAt = new Date();
-    answer.acceptedBy = req.user.id;
+    answer.acceptedBy = req.user?.id;
     await answer.save();
 
     // Update question
