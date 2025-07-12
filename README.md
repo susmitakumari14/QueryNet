@@ -17,4 +17,4 @@
 
 ## 📽️ Demo Video
 
-[▶️ Click to Watch the Demo Video](https://github.com/ashimapillai1808/StackIt/raw/main/Demo_Video.mp4)
+▶️ [Watch the Demo Video on Google Drive](https://drive.google.com/file/d/1E4VbUBmT5FxbcLKA5intHSXmp26eqn7U/view)
