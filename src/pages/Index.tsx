@@ -120,7 +120,7 @@ const Index = () => {
       if (!isAuthenticated) {
         showNotification({
           type: "info",
-          title: "Welcome to QueryNet!",
+          title: "Welcome to StackIt!",
           message: "Please login to ask questions and get personalized recommendations.",
           action: {
             label: "Login",
