@@ -1,0 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 225 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 225 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 15% 15%;
+
+    --primary: 261 73% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 261 73% 60%;
+    --primary-glow: 261 73% 85%;
+
+    --secondary: 225 10% 96%;
+    --secondary-foreground: 225 15% 25%;
+
+    --muted: 225 10% 97%;
+    --muted-foreground: 225 8% 55%;
+
+    --accent: 225 10% 95%;
+    --accent-foreground: 225 15% 25%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 225 20% 90%;
+    --input: 225 20% 92%;
+    --ring: 261 73% 65%;
+
+    --radius: 0.75rem;
+    
+    /* Custom StackIt Colors */
+    --brand-blue: 219 100% 62%;
+    --brand-purple: 261 73% 65%;
+    --vote-up: 142 76% 36%;
+    --vote-down: 0 72% 51%;
+    --accepted: 142 76% 36%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(219 100% 62%), hsl(261 73% 65%));
+    --gradient-subtle: linear-gradient(135deg, hsl(225 10% 98%), hsl(225 10% 95%));
+    
+    /* Shadows */
+    --shadow-soft: 0 1px 3px 0 hsl(225 15% 15% / 0.1), 0 1px 2px -1px hsl(225 15% 15% / 0.1);
+    --shadow-medium: 0 4px 6px -1px hsl(225 15% 15% / 0.1), 0 2px 4px -2px hsl(225 15% 15% / 0.1);
+    --shadow-large: 0 10px 15px -3px hsl(225 15% 15% / 0.1), 0 4px 6px -4px hsl(225 15% 15% / 0.1);
+    
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 225 15% 8%;
+    --foreground: 225 10% 95%;
+
+    --card: 225 15% 10%;
+    --card-foreground: 225 10% 95%;
+
+    --popover: 225 15% 10%;
+    --popover-foreground: 225 10% 95%;
+
+    --primary: 261 73% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 261 73% 70%;
+    --primary-glow: 261 73% 85%;
+
+    --secondary: 225 15% 15%;
+    --secondary-foreground: 225 10% 85%;
+
+    --muted: 225 15% 12%;
+    --muted-foreground: 225 8% 65%;
+
+    --accent: 225 15% 14%;
+    --accent-foreground: 225 10% 85%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 225 15% 20%;
+    --input: 225 15% 18%;
+    --ring: 261 73% 65%;
+
+    /* Custom StackIt Colors - Dark */
+    --brand-blue: 219 100% 70%;
+    --brand-purple: 261 73% 70%;
+    --vote-up: 142 76% 45%;
+    --vote-down: 0 72% 60%;
+    --accepted: 142 76% 45%;
+    
+    /* Gradients - Dark */
+    --gradient-primary: linear-gradient(135deg, hsl(219 100% 70%), hsl(261 73% 70%));
+    --gradient-subtle: linear-gradient(135deg, hsl(225 15% 12%), hsl(225 15% 15%));
+    
+    /* Shadows - Dark */
+    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-large: 0 10px 15px -3px hsl(0 0% 0% / 0.3), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
+
+    --sidebar-background: 225 15% 10%;
+    --sidebar-foreground: 225 10% 85%;
+    --sidebar-primary: 261 73% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 225 15% 14%;
+    --sidebar-accent-foreground: 225 10% 85%;
+    --sidebar-border: 225 15% 20%;
+    --sidebar-ring: 261 73% 65%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    /* Better touch targets */
+    button, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    /* Better scroll behavior */
+    * {
+      scroll-behavior: smooth;
+    }
+    
+    /* Improve tap highlights */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Better text rendering on mobile */
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  }
+}
+
+@layer utilities {
+  /* Mobile-specific utilities */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+  
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better line clamping for mobile */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Notification badge positioning fix */
+  .notification-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* Header button alignment */
+  .header-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
