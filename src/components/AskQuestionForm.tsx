@@ -5,6 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RichTextEditor } from "./RichTextEditor";
 import { X, HelpCircle, Info, CheckCircle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface AskQuestionFormProps {
   onSubmit?: (question: {
@@ -23,6 +27,11 @@ export function AskQuestionForm({ onSubmit, onCancel }: AskQuestionFormProps) {
   const [showTitleTips, setShowTitleTips] = useState(false);
   const [showBodyTips, setShowBodyTips] = useState(false);
   const [showTagTips, setShowTagTips] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && currentTag.trim()) {
@@ -38,13 +47,61 @@ export function AskQuestionForm({ onSubmit, onCancel }: AskQuestionFormProps) {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleSubmit = () => {
-    if (title.trim() && description.trim() && tags.length > 0) {
-      onSubmit?.({
-        title: title.trim(),
-        description: description.trim(),
-        tags
+  const handleSubmit = async () => {
+    if (!title.trim() || !description.trim() || tags.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
       });
+      return;
+    }
+
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to ask a question",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await api.createQuestion({
+        title: title.trim(),
+        body: description.trim(),
+        tags,
+      });
+
+      if (response.success && response.data) {
+        toast({
+          title: "Question Posted!",
+          description: "Your question has been posted successfully.",
+        });
+        
+        // Call the onSubmit prop if provided (for compatibility)
+        onSubmit?.({
+          title: title.trim(),
+          description: description.trim(),
+          tags,
+        });
+
+        // Navigate to the question detail page
+        navigate(`/question/${response.data._id}`);
+      } else {
+        throw new Error(response.error || 'Failed to post question');
+      }
+    } catch (error) {
+      console.error('Error posting question:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to post question. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -237,11 +294,11 @@ export function AskQuestionForm({ onSubmit, onCancel }: AskQuestionFormProps) {
             </Button>
             <Button 
               onClick={handleSubmit}
-              disabled={!isValid}
+              disabled={!isValid || isSubmitting}
               className="min-w-[140px] bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
               size="lg"
             >
-              Post Your Question
+              {isSubmitting ? "Posting..." : "Post Your Question"}
             </Button>
           </div>
         </div>

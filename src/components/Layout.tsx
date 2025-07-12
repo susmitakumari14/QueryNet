@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bell, Search, Plus, User, Menu, LogIn, LogOut, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,7 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,22 +21,19 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notificationCount, setNotificationCount] = useState(3);
   const isMobile = useIsMobile();
+  const { user, isAuthenticated, logout } = useAuth();
   
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-    setShowLoginModal(false);
-    // Simulate getting notifications when logged in
-    setNotificationCount(3);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setNotificationCount(0);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      setNotificationCount(0);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
   };
 
   const handleNotificationClick = () => {
@@ -82,11 +79,11 @@ export function Layout({ children }: LayoutProps) {
                   className="header-button hover:bg-muted/50 transition-all duration-200 touch-manipulation"
                   onClick={handleNotificationClick}
                   title="Notifications"
-                  aria-label={isLoggedIn ? `Notifications (${notificationCount} unread)` : "Notifications"}
+                  aria-label={isAuthenticated ? `Notifications (${notificationCount} unread)` : "Notifications"}
                 >
                   <Bell className="h-5 w-5 transition-transform hover:scale-110" />
                 </Button>
-                {isLoggedIn && notificationCount > 0 && (
+                {isAuthenticated && notificationCount > 0 && (
                   <Badge className="notification-badge bg-red-500 text-white border-2 border-background animate-pulse">
                     {notificationCount > 9 ? '9+' : notificationCount}
                   </Badge>
@@ -117,7 +114,7 @@ export function Layout({ children }: LayoutProps) {
               <ThemeToggle />
 
               {/* Settings Button - Desktop only */}
-              {isLoggedIn && !isMobile && (
+              {isAuthenticated && !isMobile && (
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -129,7 +126,7 @@ export function Layout({ children }: LayoutProps) {
                 </Button>
               )}
 
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon" className="header-button">
@@ -137,6 +134,9 @@ export function Layout({ children }: LayoutProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-2 text-sm font-medium border-b">
+                      {user?.username || user?.email}
+                    </div>
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
                       <User className="mr-2 h-4 w-4" />
                       Profile
@@ -160,7 +160,7 @@ export function Layout({ children }: LayoutProps) {
                 <>
                   <Button 
                     variant="outline" 
-                    onClick={() => setShowLoginModal(true)}
+                    onClick={() => navigate('/login')}
                     className="hidden sm:flex"
                   >
                     <LogIn className="h-4 w-4 mr-2" />
@@ -168,7 +168,7 @@ export function Layout({ children }: LayoutProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    onClick={() => setShowLoginModal(true)}
+                    onClick={() => navigate('/login')}
                     className="sm:hidden"
                     size="sm"
                   >
@@ -225,7 +225,7 @@ export function Layout({ children }: LayoutProps) {
                   <Plus className="h-4 w-4 mr-2" />
                   Ask Question
                 </Button>
-                {isLoggedIn && (
+                {isAuthenticated && (
                   <>
                     <Button 
                       variant="ghost" 
@@ -278,12 +278,12 @@ export function Layout({ children }: LayoutProps) {
                     </Button>
                   </>
                 )}
-                {!isLoggedIn && (
+                {!isAuthenticated && (
                   <Button 
                     variant="default" 
                     className="w-full bg-blue-600 hover:bg-blue-700"
                     onClick={() => {
-                      setShowLoginModal(true);
+                      navigate('/login');
                       setShowMobileMenu(false);
                     }}
                   >
@@ -296,38 +296,6 @@ export function Layout({ children }: LayoutProps) {
           )}
         </div>
       </header>
-
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle className="text-center">Login to QueryNet</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input placeholder="Enter your email" type="email" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
-                <Input placeholder="Enter your password" type="password" />
-              </div>
-              <div className="flex items-center gap-2 pt-2">
-                <Button onClick={handleLogin} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                  Login
-                </Button>
-                <Button variant="outline" onClick={() => setShowLoginModal(false)} className="flex-1">
-                  Cancel
-                </Button>
-              </div>
-              <div className="text-center text-sm text-muted-foreground">
-                Don't have an account? <a href="#" className="text-blue-600 hover:underline">Sign up</a>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">

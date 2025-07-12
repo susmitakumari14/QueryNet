@@ -11,78 +11,127 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Award
+  Award,
+  Loader2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NotificationBar, useNotifications } from "@/components/NotificationBar";
-
-// Mock data
-const mockQuestions = [
-  {
-    id: "1",
-    title: "How to join 2 columns in a data set to make a separate column in SQL",
-    description: "I do not know the code for it as I am a beginner. As an example what I need to do is like there is a column 1 containing First name and column 2 consists of last name I want a column to combine...",
-    author: "User Name",
-    createdAt: "5 min",
-    tags: ["sql", "join"],
-    votes: 0,
-    answers: 0,
-    accepted: false,
-    views: 3
-  },
-  {
-    id: "2", 
-    title: "Question.....",
-    description: "Description....",
-    author: "User Name",
-    createdAt: "1 min", 
-    tags: ["tag", "tag2"],
-    votes: 0,
-    answers: 0,
-    accepted: false,
-    views: 1
-  },
-  {
-    id: "3",
-    title: "Question.....",
-    description: "Description....",
-    author: "User Name", 
-    createdAt: "2 min",
-    tags: ["tag", "tag2"],
-    votes: 0,
-    answers: 0,
-    accepted: false,
-    views: 2
-  }
-];
+import { useAuth } from "@/hooks/useAuth";
+import { api, Question } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const navigate = useNavigate();
-  const [selectedFilter, setSelectedFilter] = useState("Newest");
+  const [selectedFilter, setSelectedFilter] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [popularQuestions, setPopularQuestions] = useState<Question[]>([]);
+  const [popularTags, setPopularTags] = useState<Array<{ tag: string; count: number }>>([]);
+  const [stats, setStats] = useState({
+    totalQuestions: 0,
+    totalUsers: 0,
+    questionsToday: 0,
+    answeredPercentage: 0
+  });
   const { notification, showNotification, dismissNotification } = useNotifications();
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
-  const totalPages = 7;
+  // Fetch questions from backend
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.getQuestions({
+          page: currentPage,
+          limit: 10,
+          sort: selectedFilter as 'newest' | 'active' | 'votes' | 'unanswered'
+        });
+
+        if (response.success && response.data) {
+          setQuestions(response.data);
+          if (response.pagination) {
+            setTotalPages(response.pagination.pages);
+            setTotalCount(response.pagination.total);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching questions:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load questions. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [currentPage, selectedFilter, toast]);
+
+  // Fetch community stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await api.getStats();
+        if (response.success && response.data) {
+          setStats(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        // Use fallback data if stats API fails
+      }
+    };
+
+    const fetchPopularQuestions = async () => {
+      try {
+        const response = await api.getPopularQuestions(4, 7); // Get 4 popular questions from last 7 days
+        if (response.success && response.data) {
+          setPopularQuestions(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching popular questions:', error);
+      }
+    };
+
+    const fetchPopularTags = async () => {
+      try {
+        const response = await api.getPopularTags(8);
+        if (response.success && response.data) {
+          setPopularTags(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching popular tags:', error);
+      }
+    };
+
+    fetchStats();
+    fetchPopularQuestions();
+    fetchPopularTags();
+  }, []);
 
   // Demo notification on page load
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!isLoggedIn) {
+      if (!isAuthenticated) {
         showNotification({
           type: "info",
           title: "Welcome to QueryNet!",
           message: "Please login to ask questions and get personalized recommendations.",
           action: {
             label: "Login",
-            onClick: () => setIsLoggedIn(true)
+            onClick: () => navigate('/login')
           }
         });
       }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [showNotification, isLoggedIn]);
+  }, [showNotification, isAuthenticated, navigate]);
 
   const handleQuestionClick = (questionId: string) => {
     navigate(`/question/${questionId}`);
@@ -158,7 +207,7 @@ const Index = () => {
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold">All Questions</h1>
                   <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                    {isLoggedIn ? "User can see questions with out login" : "Filters"}
+                    {totalCount} question{totalCount !== 1 ? 's' : ''} found
                   </p>
                 </div>
                 <Button 
@@ -175,25 +224,25 @@ const Index = () => {
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
                   <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Sort by:</span>
                   <Button
-                    variant={selectedFilter === "Newest" ? "default" : "outline"}
+                    variant={selectedFilter === "newest" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedFilter("Newest")}
+                    onClick={() => setSelectedFilter("newest")}
                   >
                     Newest
                   </Button>
                   <Button
-                    variant={selectedFilter === "Unanswered" ? "default" : "outline"}
+                    variant={selectedFilter === "unanswered" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedFilter("Unanswered")}
+                    onClick={() => setSelectedFilter("unanswered")}
                   >
                     Unanswered
                   </Button>
                   <Button
-                    variant={selectedFilter === "more" ? "default" : "outline"}
+                    variant={selectedFilter === "votes" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedFilter("more")}
+                    onClick={() => setSelectedFilter("votes")}
                   >
-                    more ▼
+                    Most Votes
                   </Button>
                 </div>
                 <Button variant="outline" size="sm" className="w-full sm:w-auto">
@@ -204,59 +253,84 @@ const Index = () => {
 
               {/* Questions List */}
               <div className="space-y-4">
-                {mockQuestions.map((question) => (
-                  <Card 
-                    key={question.id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer border-border/50"
-                    onClick={() => handleQuestionClick(question.id)}
-                  >
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                        {/* Stats */}
-                        <div className="flex sm:flex-col items-center sm:items-center text-sm text-muted-foreground sm:min-w-[80px] space-x-4 sm:space-x-0 sm:space-y-1 justify-center sm:justify-start">
-                          <div className="text-center">
-                            <div className="font-medium text-xs sm:text-sm">{question.votes}</div>
-                            <div className="text-xs">votes</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-xs sm:text-sm">{question.answers}</div>
-                            <div className="text-xs">answers</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-xs sm:text-sm">{question.views}</div>
-                            <div className="text-xs">views</div>
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1">
-                          <h3 className="font-medium text-blue-600 hover:text-blue-800 mb-2 text-sm sm:text-base leading-tight">
-                            {question.title}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
-                            {question.description}
-                          </p>
-                          
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                            <div className="flex gap-1 sm:gap-2 flex-wrap">
-                              {question.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                            
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span className="truncate">{question.author}</span>
-                              <span>•</span>
-                              <span>{question.createdAt}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading questions...</span>
+                  </div>
+                ) : questions.length === 0 ? (
+                  <Card className="border-border/50">
+                    <CardContent className="p-8 text-center">
+                      <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No questions found</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Be the first to ask a question in this community!
+                      </p>
+                      <Button onClick={() => navigate('/ask')}>
+                        Ask the First Question
+                      </Button>
                     </CardContent>
                   </Card>
-                ))}
+                ) : (
+                  questions.map((question) => (
+                    <Card 
+                      key={question._id} 
+                      className="hover:shadow-md transition-shadow cursor-pointer border-border/50"
+                      onClick={() => handleQuestionClick(question._id)}
+                    >
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                          {/* Stats */}
+                          <div className="flex sm:flex-col items-center sm:items-center text-sm text-muted-foreground sm:min-w-[80px] space-x-4 sm:space-x-0 sm:space-y-1 justify-center sm:justify-start">
+                            <div className="text-center">
+                              <div className="font-medium text-xs sm:text-sm">{question.votes?.length || 0}</div>
+                              <div className="text-xs">votes</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium text-xs sm:text-sm">{question.answers?.length || 0}</div>
+                              <div className="text-xs">answers</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium text-xs sm:text-sm">{question.views}</div>
+                              <div className="text-xs">views</div>
+                            </div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1">
+                            <h3 className="font-medium text-blue-600 hover:text-blue-800 mb-2 text-sm sm:text-base leading-tight">
+                              {question.title}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
+                              {question.body?.replace(/<[^>]*>/g, '').substring(0, 150)}
+                              {question.body?.replace(/<[^>]*>/g, '').length > 150 ? '...' : ''}
+                            </p>
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                              <div className="flex gap-1 sm:gap-2 flex-wrap">
+                                {question.tags.map((tag) => (
+                                  <Badge key={tag} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                              
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="truncate">{question.author.username}</span>
+                                <span>•</span>
+                                <span>{new Date(question.createdAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: new Date(question.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                                })}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
 
               {/* Pagination */}
@@ -271,7 +345,7 @@ const Index = () => {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {!isLoggedIn && (
+              {!isAuthenticated && (
                 <Card className="shadow-sm border-border/50 bg-blue-50 dark:bg-blue-950/30">
                   <CardHeader>
                     <CardTitle className="text-lg text-blue-800 dark:text-blue-200">
@@ -285,11 +359,15 @@ const Index = () => {
                     <div className="space-y-2">
                       <Button 
                         className="w-full bg-blue-600 hover:bg-blue-700"
-                        onClick={() => setIsLoggedIn(true)}
+                        onClick={() => navigate('/login')}
                       >
                         Login
                       </Button>
-                      <Button variant="outline" className="w-full">
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => navigate('/login')}
+                      >
                         Sign Up
                       </Button>
                     </div>
@@ -308,28 +386,28 @@ const Index = () => {
                       <MessageSquare className="h-5 w-5 text-blue-600" />
                       <span className="text-sm">Total Questions</span>
                     </div>
-                    <span className="font-semibold">1,234</span>
+                    <span className="font-semibold">{stats.totalQuestions.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Users className="h-5 w-5 text-green-600" />
                       <span className="text-sm">Active Users</span>
                     </div>
-                    <span className="font-semibold">456</span>
+                    <span className="font-semibold">{stats.totalUsers.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <TrendingUp className="h-5 w-5 text-orange-600" />
                       <span className="text-sm">Questions Today</span>
                     </div>
-                    <span className="font-semibold">23</span>
+                    <span className="font-semibold">{stats.questionsToday}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <Award className="h-5 w-5 text-purple-600" />
                       <span className="text-sm">Answered</span>
                     </div>
-                    <span className="font-semibold">89%</span>
+                    <span className="font-semibold">{stats.answeredPercentage}%</span>
                   </div>
                 </CardContent>
               </Card>
@@ -341,14 +419,30 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {['javascript', 'react', 'python', 'sql', 'css', 'html', 'node.js', 'typescript'].map((tag) => (
-                      <div key={tag} className="flex items-center justify-between">
-                        <Badge variant="secondary" className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30">
-                          {tag}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">×{Math.floor(Math.random() * 100)}</span>
-                      </div>
-                    ))}
+                    {popularTags.length > 0 ? (
+                      popularTags.map((tagData) => (
+                        <div key={tagData.tag} className="flex items-center justify-between">
+                          <Badge 
+                            variant="secondary" 
+                            className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                            onClick={() => navigate(`/questions/tag/${tagData.tag}`)}
+                          >
+                            {tagData.tag}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">×{tagData.count}</span>
+                        </div>
+                      ))
+                    ) : (
+                      // Fallback content while loading
+                      ['javascript', 'react', 'python', 'sql', 'css', 'html', 'node.js', 'typescript'].map((tag) => (
+                        <div key={tag} className="flex items-center justify-between">
+                          <Badge variant="secondary" className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30">
+                            {tag}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">×{Math.floor(Math.random() * 100)}</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -363,20 +457,32 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {[
-                      "How to optimize React performance?",
-                      "Best practices for SQL queries",
-                      "Understanding async/await in JavaScript",
-                      "CSS Grid vs Flexbox comparison"
-                    ].map((question, index) => (
-                      <a 
-                        key={index}
-                        href="#" 
-                        className="block text-sm text-blue-600 hover:text-blue-800 line-clamp-2"
-                      >
-                        {question}
-                      </a>
-                    ))}
+                    {popularQuestions.length > 0 ? (
+                      popularQuestions.map((question) => (
+                        <button
+                          key={question._id}
+                          onClick={() => navigate(`/question/${question._id}`)}
+                          className="block w-full text-left text-sm text-blue-600 hover:text-blue-800 line-clamp-2"
+                        >
+                          {question.title}
+                        </button>
+                      ))
+                    ) : (
+                      // Fallback content while loading
+                      [
+                        "How to optimize React performance?",
+                        "Best practices for SQL queries",
+                        "Understanding async/await in JavaScript",
+                        "CSS Grid vs Flexbox comparison"
+                      ].map((question, index) => (
+                        <div 
+                          key={index}
+                          className="block text-sm text-muted-foreground line-clamp-2"
+                        >
+                          {question}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

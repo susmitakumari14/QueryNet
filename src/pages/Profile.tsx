@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
+import { AuthContext } from "@/contexts/auth";
 import { useLocation } from "react-router-dom";
+import { api, UserProfile, NotificationPreferences } from "@/lib/api";
 import { 
   User, 
   Settings, 
@@ -30,13 +33,22 @@ import {
   Moon,
   Smartphone,
   Key,
+  Loader2,
 } from "lucide-react";
 
 export default function Profile() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("profile");
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const authContext = useContext(AuthContext);
+  
+  if (!authContext) {
+    throw new Error('Profile must be used within AuthProvider');
+  }
 
   // Handle URL parameters for direct navigation to tabs
   useEffect(() => {
@@ -46,28 +58,43 @@ export default function Profile() {
       setActiveTab(tab);
     }
   }, [location.search]);
-  const [profile, setProfile] = useState({
-    username: "john_doe",
-    email: "john@example.com",
-    fullName: "John Doe",
-    bio: "Full-stack developer passionate about React and Node.js. Love helping others solve coding problems.",
-    location: "San Francisco, CA",
-    website: "https://johndoe.dev",
-    joinDate: "January 2023",
-    reputation: 1234,
-    questionsAsked: 15,
-    answersGiven: 23,
-    acceptedAnswers: 18,
-    profileViews: 456
+
+  const [profile, setProfile] = useState<UserProfile>({
+    id: '',
+    username: '',
+    email: '',
+    avatar: '',
+    reputation: 0,
+    role: 'user' as const,
+    bio: '',
+    location: '',
+    website: '',
+    badges: [],
+    preferences: {
+      emailNotifications: true,
+      pushNotifications: true,
+      theme: 'light' as const,
+    },
+    stats: {
+      questionsAsked: 0,
+      answersGiven: 0,
+      commentsPosted: 0,
+      upvotesReceived: 0,
+      downvotesReceived: 0,
+      acceptedAnswers: 0,
+    },
+    lastActive: '',
+    createdAt: '',
+    isVerified: false,
   });
 
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState<NotificationPreferences>({
     emailQuestions: true,
     emailAnswers: true,
     emailComments: false,
     pushNotifications: true,
     weeklyDigest: true,
-    promotionalEmails: false
+    promotionalEmails: false,
   });
 
   const [settings, setSettings] = useState({
@@ -78,6 +105,52 @@ export default function Profile() {
     publicProfile: true,
     showEmail: false
   });
+
+  useEffect(() => {
+    loadProfile();
+    loadNotificationPreferences();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.getCurrentUserProfile();
+      if (response.success && response.data) {
+        setProfile(response.data);
+        setSettings(prev => ({
+          ...prev,
+          theme: response.data.preferences.theme || 'auto',
+        }));
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to load profile",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Load profile error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadNotificationPreferences = async () => {
+    try {
+      const response = await api.getNotificationPreferences();
+      if (response.success && response.data) {
+        setNotifications(response.data);
+      }
+    } catch (error) {
+      console.error('Load notification preferences error:', error);
+    }
+  };
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -94,28 +167,109 @@ export default function Profile() {
     password: ""
   });
 
-  const handleProfileSave = () => {
-    setIsEditing(false);
-    // Here you would save to backend
-    console.log("Profile saved:", profile);
+  const handleProfileSave = async () => {
+    try {
+      setIsSaving(true);
+      const response = await api.updateUserProfile({
+        username: profile.username,
+        bio: profile.bio,
+        location: profile.location,
+        website: profile.website,
+      });
+
+      if (response.success && response.data) {
+        setProfile(response.data);
+        setIsEditing(false);
+        toast({
+          title: "Success",
+          description: "Profile updated successfully",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to update profile",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Profile save error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    // Here you would save to backend
-    console.log("Notification setting updated:", key, value);
+  const handleNotificationChange = async (key: string, value: boolean) => {
+    try {
+      const updatedNotifications = { ...notifications, [key]: value };
+      setNotifications(updatedNotifications);
+
+      const response = await api.updateNotificationPreferences(updatedNotifications);
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Notification preferences updated",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to update notification preferences",
+          variant: "destructive",
+        });
+        // Revert on error
+        setNotifications(notifications);
+      }
+    } catch (error) {
+      console.error('Notification change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update notification preferences",
+        variant: "destructive",
+      });
+      // Revert on error
+      setNotifications(notifications);
+    }
   };
 
-  const handleSettingChange = (key: string, value: string | boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    // Here you would save to backend
-    console.log("Setting updated:", key, value);
+  const handleSettingChange = async (key: string, value: string | boolean) => {
+    try {
+      const updatedSettings = { ...settings, [key]: value };
+      setSettings(updatedSettings);
+
+      if (key === 'theme') {
+        const response = await api.updateUserPreferences({
+          theme: value as 'light' | 'dark' | 'system',
+        });
+        
+        if (response.success) {
+          toast({
+            title: "Success",
+            description: "Theme preference updated",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: response.error || "Failed to update theme preference",
+            variant: "destructive",
+          });
+          // Revert on error
+          setSettings(settings);
+        }
+      }
+    } catch (error) {
+      console.error('Setting change error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update setting",
+        variant: "destructive",
+      });
+      // Revert on error
+      setSettings(settings);
+    }
   };
 
   const handlePasswordChange = () => {
@@ -154,9 +308,9 @@ export default function Profile() {
 
   const userStats = [
     { label: "Reputation", value: profile.reputation, icon: Award, color: "text-yellow-600" },
-    { label: "Questions", value: profile.questionsAsked, icon: MessageSquare, color: "text-blue-600" },
-    { label: "Answers", value: profile.answersGiven, icon: ThumbsUp, color: "text-green-600" },
-    { label: "Profile Views", value: profile.profileViews, icon: Eye, color: "text-purple-600" }
+    { label: "Questions", value: profile.stats.questionsAsked, icon: MessageSquare, color: "text-blue-600" },
+    { label: "Answers", value: profile.stats.answersGiven, icon: ThumbsUp, color: "text-green-600" },
+    { label: "Accepted", value: profile.stats.acceptedAnswers, icon: Eye, color: "text-purple-600" }
   ];
 
   const recentActivity = [
@@ -165,6 +319,18 @@ export default function Profile() {
     { type: "answer", title: "Optimizing React performance", time: "3 days ago" },
     { type: "question", title: "Understanding TypeScript generics", time: "1 week ago" }
   ];
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto px-4 sm:px-0">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -190,7 +356,7 @@ export default function Profile() {
               {/* User Info */}
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
-                  <h1 className="text-xl sm:text-2xl font-bold">{profile.fullName}</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold">{profile.username}</h1>
                   <Button
                     variant="outline"
                     size={isMobile ? "sm" : "default"}
@@ -217,7 +383,10 @@ export default function Profile() {
                   </div>
                   <div className="flex items-center justify-center sm:justify-start gap-1">
                     <Calendar className="h-4 w-4" />
-                    Joined {profile.joinDate}
+                    Joined {new Date(profile.createdAt || '').toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long' 
+                    })}
                   </div>
                 </div>
               </div>
@@ -290,14 +459,6 @@ export default function Profile() {
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="fullName">Full Name</Label>
-                          <Input
-                            id="fullName"
-                            value={profile.fullName}
-                            onChange={(e) => setProfile(prev => ({ ...prev, fullName: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
                           <Label htmlFor="username">Username</Label>
                           <Input
                             id="username"
@@ -351,9 +512,18 @@ export default function Profile() {
                         <Button variant="outline" onClick={() => setIsEditing(false)}>
                           Cancel
                         </Button>
-                        <Button onClick={handleProfileSave}>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save Changes
+                        <Button onClick={handleProfileSave} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
                         </Button>
                       </div>
                     </>
